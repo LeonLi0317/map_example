@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaflet Custom Image Floor Plan</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+  <style>
+    #map { 
+      height: 600px; 
+      width: 100%;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+    button {
+      margin-right: 10px;
+      padding: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <div class="controls">
+    <button id="btnA">選擇倉庫 A</button>
+    <button id="btnB">選擇倉庫 B</button>
+    <button id="btnC">選擇倉庫 C</button>
+    <button id="btnClear">清除標註</button>
+    <button id="btnSave">儲存標註</button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script>
+    // 初始化地圖
+    const map = L.map('map', {
+      crs: L.CRS.Simple,  // 使用自訂圖片的座標系統
+      center: [0, 0],
+      zoom: 3,
+      maxZoom: 5,
+    });
+
+    // 載入平面圖圖片
+    const imageUrl = 'https://yoodesign.com.tw/blog/002/og-image'; // 請替換為你的圖片 URL
+    const imageBounds = [[0, 0], [1000, 1000]];  // 根據圖片大小設定範圍
+    L.imageOverlay(imageUrl, imageBounds).addTo(map);
+    map.fitBounds(imageBounds);
+
+    // 從資料庫取得的倉庫點位資料（初始為 null）
+    const warehousePoints = {
+      A: { lat: null, lng: null },
+      B: { lat: null, lng: null },
+      C: { lat: null, lng: null }
+    };
+
+    let selectedWarehouse = null;  // 當前選取的倉庫
+    let markers = {};              // 用來記錄各倉庫的標註 marker
+
+    // 清除特定倉庫的標註
+    function clearWarehouseMarker(warehouseId) {
+      if (markers[warehouseId]) {
+        map.removeLayer(markers[warehouseId]);
+        delete markers[warehouseId];
+      }
+    }
+
+    // 以下三個按鈕：點選倉庫時，先清除該倉庫現有的標註並重置資料
+    document.getElementById('btnA').addEventListener('click', () => {
+      selectedWarehouse = 'A';
+      clearWarehouseMarker('A');
+      warehousePoints['A'] = { lat: null, lng: null };
+    });
+
+    document.getElementById('btnB').addEventListener('click', () => {
+      selectedWarehouse = 'B';
+      clearWarehouseMarker('B');
+      warehousePoints['B'] = { lat: null, lng: null };
+    });
+
+    document.getElementById('btnC').addEventListener('click', () => {
+      selectedWarehouse = 'C';
+      clearWarehouseMarker('C');
+      warehousePoints['C'] = { lat: null, lng: null };
+    });
+
+    // 當使用者在地圖上點選時，新增或更新該倉庫的標註點
+    map.on('click', function(e) {
+      if (!selectedWarehouse) {
+        alert('請先選擇一個倉庫！');
+        return;
+      }
+
+      const latLng = e.latlng;
+
+      // 若該倉庫已存在標註，先清除（此步驟可避免重複）
+      if (warehousePoints[selectedWarehouse].lat !== null && warehousePoints[selectedWarehouse].lng !== null) {
+        clearWarehouseMarker(selectedWarehouse);
+      }
+
+      // 在點擊位置新增新的標註 marker
+      const newMarker = L.marker([latLng.lat, latLng.lng]).addTo(map);
+      newMarker.bindPopup(`倉庫 ${selectedWarehouse} 標註點`).openPopup();
+      markers[selectedWarehouse] = newMarker;
+
+      // 更新倉庫的點位資料
+      warehousePoints[selectedWarehouse] = { lat: latLng.lat, lng: latLng.lng };
+    });
+
+    // 清除目前選取倉庫的標註
+    document.getElementById('btnClear').addEventListener('click', () => {
+      if (!selectedWarehouse) {
+        alert('請先選擇倉庫，然後標註一個點！');
+        return;
+      }
+      clearWarehouseMarker(selectedWarehouse);
+      warehousePoints[selectedWarehouse] = { lat: null, lng: null };
+    });
+
+    // 儲存標註資料（示範：僅當倉庫 A 有標註時才允許儲存）
+    document.getElementById('btnSave').addEventListener('click', () => {
+      if (warehousePoints['A'].lat === null || warehousePoints['A'].lng === null) {
+        alert('倉庫 A 尚未設定標註點，無法儲存!');
+        return;
+      }
+
+      const savedData = [];
+      for (const warehouseId in warehousePoints) {
+        const { lat, lng } = warehousePoints[warehouseId];
+        if (lat !== null && lng !== null) {
+          savedData.push({
+            id: warehouseId,
+            lat: lat,
+            lng: lng
+          });
+        }
+      }
+
+      console.log("儲存的標註資料:", savedData);
+
+      // 可將 savedData 傳送到後端進行儲存
+      // fetch('/save_markers', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json'
+      //   },
+      //   body: JSON.stringify(savedData)
+      // });
+    });
+  </script>
+
+</body>
+</html>
